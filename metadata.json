@@ -1,0 +1,9 @@
+{
+  "name": "Copy of Copy of Artists Facebook",
+  "description": "A dedicated social platform for Indian artists to connect, showcase work, book studios, and trade art.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
