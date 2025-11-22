@@ -1,19 +1,51 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Event } from '../types';
-import { Calendar, MapPin, Star, Share2, Plus, Wand2 } from 'lucide-react';
+import { Calendar, MapPin, Star, Share2, Plus, Wand2, Check } from 'lucide-react';
 import { generateDescription } from '../services/geminiService';
-
-const MOCK_EVENTS: Event[] = [
-  { id: 'ev1', title: 'Mumbai Art Fair 2024', date: 'OCT 15', location: 'BKC Grounds, Mumbai', type: 'In-Person', interestedCount: 1200, host: 'Art India', image: 'https://picsum.photos/800/400?random=20' },
-  { id: 'ev2', title: 'Digital Painting Workshop', date: 'NOV 02', location: 'Online (Zoom)', type: 'Online', interestedCount: 450, host: 'Rohan Gupta', image: 'https://picsum.photos/800/400?random=21' },
-];
+import { getEvents, createEvent, rsvpEvent } from '../services/storage';
+import { useAuth } from '../contexts/AuthContext';
 
 const Events: React.FC = () => {
-  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
+  const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventLoc, setEventLoc] = useState('');
+  
+  useEffect(() => {
+      const load = async () => {
+          const data = await getEvents();
+          setEvents(data);
+      };
+      load();
+  }, [showCreate]);
+
+  const handleRSVP = async (id: string) => {
+      if(!user) return;
+      await rsvpEvent(id, user.id, 'interested');
+      // Optimistic update
+      setEvents(events.map(e => e.id === id ? { ...e, interestedCount: e.interestedCount + 1 } : e));
+  };
+
+  const handleCreate = async () => {
+      if (!user || !eventTitle) return;
+      const newEv: Event = {
+          id: `ev${Date.now()}`,
+          title: eventTitle,
+          location: eventLoc,
+          date: 'OCT 15', // Placeholder
+          image: `https://picsum.photos/800/400?random=${Date.now()}`,
+          interestedCount: 1,
+          type: 'In-Person',
+          host: user.name
+      };
+      await createEvent(newEv);
+      setEvents([newEv, ...events]);
+      setShowCreate(false);
+      setEventTitle('');
+      setEventLoc('');
+  };
   
   return (
     <div className="space-y-6">
@@ -50,7 +82,7 @@ const Events: React.FC = () => {
                              {event.interestedCount} people interested
                          </div>
                          <div className="flex gap-2">
-                             <button className="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 transition-colors">
+                             <button onClick={() => handleRSVP(event.id)} className="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 transition-colors">
                                  <Star size={16} /> Interested
                              </button>
                              <button className="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 px-3 rounded-lg transition-colors">
@@ -83,22 +115,7 @@ const Events: React.FC = () => {
                     <div className="flex gap-3 pt-2">
                         <button onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-lg bg-gray-200 dark:bg-slate-700 font-semibold">Cancel</button>
                         <button 
-                            onClick={() => {
-                                const newEv: Event = {
-                                    id: `ev${Date.now()}`,
-                                    title: eventTitle,
-                                    location: eventLoc,
-                                    date: 'TBD',
-                                    image: `https://picsum.photos/800/400?random=${Date.now()}`,
-                                    interestedCount: 1,
-                                    type: 'In-Person',
-                                    host: 'You'
-                                };
-                                setEvents([newEv, ...events]);
-                                setShowCreate(false);
-                                setEventTitle('');
-                                setEventLoc('');
-                            }} 
+                            onClick={handleCreate}
                             className="flex-1 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600"
                         >
                             Create

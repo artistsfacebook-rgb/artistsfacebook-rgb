@@ -16,7 +16,11 @@ export const DEFAULT_GUEST: User = {
   bio: 'Exploring the platform.',
   followers: 0,
   following: 0,
-  followingIds: []
+  followingIds: [],
+  friends: [],
+  friendRequests: [],
+  sentRequests: [],
+  blockedUsers: []
 };
 
 interface AuthContextType {

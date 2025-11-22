@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import { Image, Wand2, Video, Smile, Hash, X, Globe, Users, Lock, ChevronDown } from 'lucide-react';
+import { Image, Wand2, Video, Smile, Hash, X, Globe, Users, Lock, ChevronDown, BarChart2 } from 'lucide-react';
 import { generateCreativeCaption } from '../services/geminiService';
-import { User } from '../types';
+import { User, PollOption } from '../types';
 
 interface CreatePostProps {
   user: User;
-  onPostCreate: (content: string, image: string | undefined, video: string | undefined, tags: string[], visibility: 'Public' | 'Friends' | 'Private') => void;
+  onPostCreate: (content: string, image: string | undefined, video: string | undefined, tags: string[], visibility: 'Public' | 'Friends' | 'Private', poll?: {question: string, options: PollOption[]}) => void;
 }
 
 const compressImage = (file: File): Promise<string> => {
@@ -26,13 +26,10 @@ const compressImage = (file: File): Promise<string> => {
         if (ctx) {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             resolve(canvas.toDataURL('image/jpeg', 0.7));
-        } else {
-            resolve(event.target?.result as string);
-        }
+        } else { resolve(event.target?.result as string); }
       };
       img.onerror = (err) => reject(err);
     };
-    reader.onerror = (error) => reject(error);
   });
 };
 
@@ -46,6 +43,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
   const [tagInput, setTagInput] = useState('');
   const [visibility, setVisibility] = useState<'Public' | 'Friends' | 'Private'>('Public');
   const [showVisibilityMenu, setShowVisibilityMenu] = useState(false);
+  
+  // Poll State
+  const [showPoll, setShowPoll] = useState(false);
+  const [pollOptions, setPollOptions] = useState(['', '']);
 
   const handleGenerateCaption = async () => {
     if (!content.trim()) return;
@@ -60,10 +61,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
     if (file) {
       if (file.type.startsWith('video/')) {
          const reader = new FileReader();
-         reader.onloadend = () => {
-             setSelectedVideo(reader.result as string);
-             setSelectedImage(undefined);
-         };
+         reader.onloadend = () => { setSelectedVideo(reader.result as string); setSelectedImage(undefined); };
          reader.readAsDataURL(file);
       } else {
         try {
@@ -71,13 +69,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
             setSelectedImage(compressed);
             setSelectedVideo(undefined);
         } catch (err) {
-            console.error("Compression error", err);
-            // Fallback
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setSelectedImage(reader.result as string);
-                setSelectedVideo(undefined);
-            }
+            reader.onloadend = () => { setSelectedImage(reader.result as string); setSelectedVideo(undefined); }
             reader.readAsDataURL(file);
         }
       }
@@ -86,7 +79,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
 
   const handleAddTag = (e?: React.KeyboardEvent) => {
     if (e && e.key !== 'Enter') return;
-    
     const trimmedTag = tagInput.trim().replace(/^#/, '');
     if (trimmedTag && !tags.includes(trimmedTag)) {
       setTags([...tags, trimmedTag]);
@@ -94,29 +86,32 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
     }
   };
 
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-
   const handleSubmit = () => {
-    if (!content.trim() && !selectedImage && !selectedVideo) return;
-    onPostCreate(content, selectedImage, selectedVideo, tags, visibility);
+    if (!content.trim() && !selectedImage && !selectedVideo && !showPoll) return;
+    
+    let pollData;
+    if (showPoll) {
+        pollData = {
+            question: content, // Content acts as question
+            options: pollOptions.filter(o => o.trim()).map(o => ({ id: `opt_${Date.now()}_${Math.random()}`, text: o, votes: [] }))
+        };
+        if (pollData.options.length < 2) { alert("Poll needs at least 2 options"); return; }
+    }
+
+    onPostCreate(content, selectedImage, selectedVideo, tags, visibility, pollData);
     setContent('');
     setSelectedImage(undefined);
     setSelectedVideo(undefined);
     setTags([]);
     setShowTagInput(false);
-    setVisibility('Public');
+    setShowPoll(false);
+    setPollOptions(['', '']);
   };
 
-  const VisibilityIcon = {
-      'Public': Globe,
-      'Friends': Users,
-      'Private': Lock
-  }[visibility];
+  const VisibilityIcon = { 'Public': Globe, 'Friends': Users, 'Private': Lock }[visibility];
 
   return (
-    <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm p-4 mb-4 animate-in fade-in zoom-in duration-300">
       <div className="flex space-x-3 mb-3">
         <img src={user.avatar} className="w-10 h-10 rounded-full border border-gray-200 dark:border-slate-700 object-cover" alt={user.name} />
         <div className="flex-1">
@@ -129,126 +124,96 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
                     className="w-full bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[40px]"
                 />
              </div>
-             {/* Tag Chips */}
+             
+             {showPoll && (
+                 <div className="mt-3 space-y-2 border-l-4 border-blue-500 pl-3">
+                     {pollOptions.map((opt, idx) => (
+                         <input 
+                            key={idx}
+                            type="text"
+                            value={opt}
+                            onChange={e => {
+                                const newOpts = [...pollOptions];
+                                newOpts[idx] = e.target.value;
+                                setPollOptions(newOpts);
+                            }}
+                            placeholder={`Option ${idx + 1}`}
+                            className="w-full p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-600 text-sm"
+                         />
+                     ))}
+                     <button 
+                        onClick={() => setPollOptions([...pollOptions, ''])}
+                        className="text-xs text-blue-500 font-bold hover:underline"
+                     >
+                        + Add Option
+                     </button>
+                 </div>
+             )}
+
              {tags.length > 0 && (
                <div className="flex flex-wrap gap-2 mt-2 pl-1">
                  {tags.map(tag => (
                    <span key={tag} className="inline-flex items-center bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded-full">
-                     #{tag}
-                     <button onClick={() => removeTag(tag)} className="ml-1 hover:text-blue-600 dark:hover:text-blue-100">
-                       <X size={12} />
-                     </button>
+                     #{tag} <button onClick={() => setTags(tags.filter(t => t !== tag))} className="ml-1"><X size={12} /></button>
                    </span>
                  ))}
                </div>
              )}
-             {/* Tag Input Field */}
              {showTagInput && (
                <div className="mt-2 flex items-center gap-2">
                  <Hash size={16} className="text-gray-400" />
-                 <input 
-                   type="text"
-                   value={tagInput}
-                   onChange={(e) => setTagInput(e.target.value)}
-                   onKeyDown={handleAddTag}
-                   placeholder="Add a tag and press Enter"
-                   className="bg-transparent text-sm focus:outline-none text-gray-700 dark:text-gray-300 w-full"
-                   autoFocus
-                 />
+                 <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleAddTag} placeholder="Add tag..." className="bg-transparent text-sm focus:outline-none text-gray-700 dark:text-gray-300 w-full" autoFocus />
                </div>
              )}
         </div>
       </div>
       
-      {/* Media Previews */}
       {selectedImage && (
         <div className="mb-3 relative group rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
             <img src={selectedImage} alt="Preview" className="max-h-80 w-full object-cover" />
-            <button 
-                onClick={() => setSelectedImage(undefined)}
-                className="absolute top-2 right-2 bg-white dark:bg-slate-800 rounded-full p-1 text-gray-500 hover:text-red-500 shadow-md transition-colors"
-            >
-                <X size={20} />
-            </button>
+            <button onClick={() => setSelectedImage(undefined)} className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-500"><X size={20} /></button>
         </div>
       )}
-
       {selectedVideo && (
         <div className="mb-3 relative group rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 bg-black">
             <video src={selectedVideo} controls className="max-h-80 w-full" />
-            <button 
-                onClick={() => setSelectedVideo(undefined)}
-                className="absolute top-2 right-2 bg-white dark:bg-slate-800 rounded-full p-1 text-gray-500 hover:text-red-500 shadow-md transition-colors z-10"
-            >
-                <X size={20} />
-            </button>
+            <button onClick={() => setSelectedVideo(undefined)} className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-500"><X size={20} /></button>
         </div>
       )}
 
       <div className="border-t border-gray-200 dark:border-slate-700 pt-3">
          <div className="flex flex-wrap justify-between items-center gap-2">
              <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar items-center">
-                 {/* Visibility Selector */}
                  <div className="relative">
-                     <button 
-                        onClick={() => setShowVisibilityMenu(!showVisibilityMenu)}
-                        className="flex items-center space-x-1 px-2 py-1 bg-gray-100 dark:bg-slate-800 rounded-md text-xs font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-                     >
-                         <VisibilityIcon size={14} />
-                         <span>{visibility}</span>
-                         <ChevronDown size={12} />
+                     <button onClick={() => setShowVisibilityMenu(!showVisibilityMenu)} className="flex items-center space-x-1 px-2 py-1 bg-gray-100 dark:bg-slate-800 rounded-md text-xs font-medium text-gray-600 dark:text-slate-300">
+                         <VisibilityIcon size={14} /><span>{visibility}</span><ChevronDown size={12} />
                      </button>
                      {showVisibilityMenu && (
-                         <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-gray-200 dark:border-slate-700 z-20 overflow-hidden">
-                             {(['Public', 'Friends', 'Private'] as const).map((opt) => (
-                                 <button
-                                    key={opt}
-                                    onClick={() => { setVisibility(opt); setShowVisibilityMenu(false); }}
-                                    className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
-                                 >
-                                     {opt === 'Public' && <Globe size={12} />}
-                                     {opt === 'Friends' && <Users size={12} />}
-                                     {opt === 'Private' && <Lock size={12} />}
-                                     {opt}
-                                 </button>
+                         <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-gray-200 z-20">
+                             {['Public', 'Friends', 'Private'].map((opt: any) => (
+                                 <button key={opt} onClick={() => { setVisibility(opt); setShowVisibilityMenu(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-slate-700">{opt}</button>
                              ))}
                          </div>
                      )}
                  </div>
 
-                 <label className="flex items-center space-x-2 px-2 sm:px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors flex-shrink-0">
+                 <label className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors">
                     <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
                     <Image className="text-green-500" size={24} />
                  </label>
-
-                 <button className="flex items-center space-x-2 px-2 sm:px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0">
-                    <Smile className="text-yellow-500" size={24} />
+                 
+                 <button onClick={() => setShowPoll(!showPoll)} className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg ${showPoll ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                    <BarChart2 className="text-red-500" size={24} />
                  </button>
-
-                 <button 
-                   onClick={() => setShowTagInput(!showTagInput)}
-                   className={`flex items-center space-x-2 px-2 sm:px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${showTagInput ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-                 >
-                    <Hash className="text-blue-500" size={24} />
-                 </button>
-
-                 <button 
-                    onClick={handleGenerateCaption}
-                    disabled={isGenerating || !content.trim()}
-                    className="flex items-center space-x-1 px-2 py-1 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg cursor-pointer transition-colors disabled:opacity-50 text-xs text-purple-600 dark:text-purple-400"
-                 >
-                    {isGenerating ? <span className="animate-spin">✨</span> : <Wand2 size={14} />}
-                    <span className="hidden sm:inline">AI Magic</span>
+                 
+                 <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"><Smile className="text-yellow-500" size={24} /></button>
+                 <button onClick={() => setShowTagInput(!showTagInput)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"><Hash className="text-blue-500" size={24} /></button>
+                 <button onClick={handleGenerateCaption} disabled={isGenerating || !content.trim()} className="flex items-center gap-1 px-2 py-1 hover:bg-purple-50 rounded-lg text-xs text-purple-600 disabled:opacity-50">
+                    {isGenerating ? <span className="animate-spin">✨</span> : <Wand2 size={14} />} AI
                  </button>
              </div>
              
-             <button 
-                onClick={handleSubmit}
-                disabled={!content.trim() && !selectedImage && !selectedVideo}
-                className="px-6 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
-             >
-                Post
-            </button>
+             <button onClick={handleSubmit} disabled={!content.trim() && !selectedImage && !selectedVideo} className="px-6 py-1.5 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 disabled:opacity-50">Post</button>
          </div>
       </div>
     </div>

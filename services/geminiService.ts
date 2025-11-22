@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize the Gemini API client
@@ -71,5 +72,58 @@ export const generateDescription = async (name: string, type: 'Group' | 'Event' 
     return response.text || `Welcome to the ${name} ${type}!`;
   } catch (error) {
     return `A great place for ${name}.`;
+  }
+};
+
+/**
+ * Generates an AI profile picture based on user name and bio.
+ */
+export const generateAIProfilePicture = async (name: string, bio: string): Promise<string | null> => {
+  try {
+    const prompt = `A professional, artistic profile picture for an artist named ${name}. 
+    They describe themselves as: "${bio}". 
+    Style: Digital Art, Vibrant, Professional Headshot style but artistic. High quality, centered.`;
+
+    const response = await ai.models.generateImages({
+      model: 'imagen-4.0-generate-001',
+      prompt: prompt,
+      config: {
+        numberOfImages: 1,
+        aspectRatio: '1:1',
+        outputMimeType: 'image/jpeg',
+      }
+    });
+
+    const base64Image = response.generatedImages?.[0]?.image?.imageBytes;
+    if (base64Image) {
+      return `data:image/jpeg;base64,${base64Image}`;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error generating AI profile picture:", error);
+    return null;
+  }
+};
+
+/**
+ * Moderates content to check for hate speech, harassment, or unsafe text.
+ * Returns TRUE if content is safe, FALSE if unsafe.
+ */
+export const moderateContent = async (text: string): Promise<boolean> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Classify the following text for a social media live stream chat. 
+      If it contains hate speech, severe profanity, harassment, or sexually explicit content, answer "UNSAFE".
+      Otherwise, answer "SAFE".
+      
+      Text: "${text}"`,
+    });
+    
+    const result = response.text?.trim().toUpperCase();
+    return result === "SAFE";
+  } catch (error) {
+    console.error("Moderation error:", error);
+    return true; // Fail open if AI is down to avoid blocking legitimate users, or false to be strict.
   }
 };

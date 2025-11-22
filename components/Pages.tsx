@@ -1,20 +1,28 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Page } from '../types';
-import { Flag, ThumbsUp, Plus, MoreHorizontal, Wand2 } from 'lucide-react';
+import { Flag, ThumbsUp, Plus, MoreHorizontal, Wand2, CheckCircle, MessageCircle, ArrowLeft } from 'lucide-react';
 import { generateDescription } from '../services/geminiService';
-
-const MOCK_PAGES: Page[] = [
-  { id: 'pg1', name: 'Art Supplies India', category: 'Business', avatar: 'https://picsum.photos/100/100?random=10', coverImage: 'https://picsum.photos/800/300?random=10', followers: 54000, description: 'Your one stop shop for premium art supplies.' },
-  { id: 'pg2', name: 'Modern Art Gallery', category: 'Art Gallery', avatar: 'https://picsum.photos/100/100?random=11', coverImage: 'https://picsum.photos/800/300?random=11', followers: 12000, description: 'Exhibiting contemporary Indian art since 2010.' },
-];
+import { getPages, createPage } from '../services/storage';
+import Feed from './Feed';
+import { useAuth } from '../contexts/AuthContext';
 
 const Pages: React.FC = () => {
-  const [pages, setPages] = useState<Page[]>(MOCK_PAGES);
+  const { user } = useAuth();
+  const [pages, setPages] = useState<Page[]>([]);
+  const [selectedPage, setSelectedPage] = useState<Page | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [pageName, setPageName] = useState('');
   const [pageDesc, setPageDesc] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+      const load = async () => {
+          const data = await getPages();
+          setPages(data);
+      };
+      load();
+  }, [showCreate]);
 
   const handleGenerateDesc = async () => {
       if (!pageName) return;
@@ -24,7 +32,7 @@ const Pages: React.FC = () => {
       setIsGenerating(false);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
       if (!pageName) return;
       const newPage: Page = {
           id: `pg${Date.now()}`,
@@ -35,11 +43,69 @@ const Pages: React.FC = () => {
           followers: 0,
           description: pageDesc || 'Brand new page.'
       };
+      await createPage(newPage);
       setPages([newPage, ...pages]);
       setShowCreate(false);
       setPageName('');
       setPageDesc('');
   };
+
+  if (selectedPage) {
+      return (
+          <div className="bg-white dark:bg-[#242526] min-h-screen pb-10">
+              <div className="relative">
+                  <div className="h-48 md:h-64 bg-gray-300 overflow-hidden">
+                      <img src={selectedPage.coverImage} className="w-full h-full object-cover" alt="" />
+                  </div>
+                  <button onClick={() => setSelectedPage(null)} className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 z-10">
+                      <ArrowLeft size={24} />
+                  </button>
+                  
+                  <div className="max-w-5xl mx-auto px-4 relative">
+                      <div className="absolute -top-16 left-4 md:left-8 border-4 border-white dark:border-[#242526] rounded-full overflow-hidden w-32 h-32 bg-gray-200">
+                          <img src={selectedPage.avatar} className="w-full h-full object-cover" alt="" />
+                      </div>
+                      <div className="pt-20 md:pt-4 md:pl-44 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center">
+                          <div>
+                              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                  {selectedPage.name} 
+                                  <CheckCircle size={20} className="text-blue-500 fill-current text-white" />
+                              </h1>
+                              <p className="text-gray-500 text-sm font-semibold">{selectedPage.category} • {selectedPage.followers.toLocaleString()} likes</p>
+                          </div>
+                          <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto">
+                              <button className="flex-1 md:flex-none bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                                  <ThumbsUp size={18} /> Like
+                              </button>
+                              <button className="flex-1 md:flex-none bg-gray-200 dark:bg-slate-700 text-black dark:text-white px-6 py-2 rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
+                                  <MessageCircle size={18} /> Message
+                              </button>
+                          </div>
+                      </div>
+                      
+                      <div className="border-t border-gray-200 dark:border-slate-700 my-4"></div>
+                      
+                      <div className="flex flex-col md:flex-row gap-4">
+                          <div className="w-full md:w-80 space-y-4">
+                              <div className="bg-white dark:bg-[#242526] p-4 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+                                  <h3 className="font-bold mb-2 text-lg">About</h3>
+                                  <p className="text-gray-600 dark:text-gray-300 text-sm">{selectedPage.description}</p>
+                                  <div className="mt-4 flex flex-col gap-2 text-sm text-gray-500">
+                                      <div className="flex items-center gap-2"><Flag size={16} /> {selectedPage.category}</div>
+                                      <div className="flex items-center gap-2"><ThumbsUp size={16} /> {selectedPage.followers} people like this</div>
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div className="flex-1">
+                              <Feed user={user!} onToggleFollow={() => {}} pageId={selectedPage.id} />
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6">
@@ -55,7 +121,7 @@ const Pages: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
          {pages.map(page => (
-             <div key={page.id} className="bg-white dark:bg-[#242526] rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-slate-700 flex flex-col">
+             <div key={page.id} onClick={() => setSelectedPage(page)} className="bg-white dark:bg-[#242526] rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-slate-700 flex flex-col cursor-pointer hover:shadow-md transition-shadow">
                  <div className="h-24 bg-gray-300 relative">
                      <img src={page.coverImage} className="w-full h-full object-cover" alt="" />
                  </div>
@@ -66,7 +132,7 @@ const Pages: React.FC = () => {
                          </div>
                      </div>
                      <div>
-                         <h3 className="font-bold text-lg hover:underline cursor-pointer">{page.name}</h3>
+                         <h3 className="font-bold text-lg hover:underline">{page.name}</h3>
                          <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">{page.category} • {page.followers.toLocaleString()} followers</p>
                          <p className="text-sm text-gray-600 dark:text-slate-300 line-clamp-2 mb-4">{page.description}</p>
                      </div>

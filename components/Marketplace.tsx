@@ -7,7 +7,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'prod1',
     artistId: 'u1',
-    artist: { id: 'u1', name: 'Aarav Patel', handle: '@aarav_art', avatar: 'https://picsum.photos/100/100?random=1', type: 'Artist', location: 'Mumbai', followingIds: [] },
+    artist: { id: 'u1', name: 'Aarav Patel', handle: '@aarav_art', avatar: 'https://picsum.photos/100/100?random=1', type: 'Artist', location: 'Mumbai', followingIds: [], friends: [], friendRequests: [], sentRequests: [], blockedUsers: [] },
     title: 'Monsoon Abstract #4',
     image: 'https://picsum.photos/400/400?random=30',
     price: 12000,
@@ -16,7 +16,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'prod2',
     artistId: 'u2',
-    artist: { id: 'u2', name: 'Priya Singh', handle: '@priya_colors', avatar: 'https://picsum.photos/100/100?random=2', type: 'Artist', location: 'Delhi', followingIds: [] },
+    artist: { id: 'u2', name: 'Priya Singh', handle: '@priya_colors', avatar: 'https://picsum.photos/100/100?random=2', type: 'Artist', location: 'Delhi', followingIds: [], friends: [], friendRequests: [], sentRequests: [], blockedUsers: [] },
     title: 'Golden Temple Sketch',
     image: 'https://picsum.photos/400/400?random=31',
     price: 4500,
@@ -25,7 +25,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'prod3',
     artistId: 'u4',
-    artist: { id: 'u4', name: 'Urban Art Collective', handle: '@urban_co', avatar: 'https://picsum.photos/100/100?random=8', type: 'Artist', location: 'Pune', followingIds: [] },
+    artist: { id: 'u4', name: 'Urban Art Collective', handle: '@urban_co', avatar: 'https://picsum.photos/100/100?random=8', type: 'Artist', location: 'Pune', followingIds: [], friends: [], friendRequests: [], sentRequests: [], blockedUsers: [] },
     title: 'Digital Print: Neon City',
     image: 'https://picsum.photos/400/400?random=32',
     price: 2500,

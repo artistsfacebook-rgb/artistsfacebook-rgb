@@ -1,9 +1,10 @@
+
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { User, Post, Reel } from '../types';
 
 const SEED_USERS: User[] = [
-    { id: 'u1', name: 'Aarav Patel', handle: '@aarav', avatar: 'https://picsum.photos/100/100?random=1', type: 'Artist', location: 'Mumbai', bio: 'Lover of abstracts', followers: 100, following: 5, followingIds: [] },
-    { id: 'u2', name: 'Priya Singh', handle: '@priya', avatar: 'https://picsum.photos/100/100?random=2', type: 'Artist', location: 'Delhi', bio: 'Digital Illustrator', followers: 250, following: 10, followingIds: [] }
+    { id: 'u1', name: 'Aarav Patel', handle: '@aarav', avatar: 'https://picsum.photos/100/100?random=1', type: 'Artist', location: 'Mumbai', bio: 'Lover of abstracts', followers: 100, following: 5, followingIds: [], friends: [], friendRequests: [], sentRequests: [], blockedUsers: [] },
+    { id: 'u2', name: 'Priya Singh', handle: '@priya', avatar: 'https://picsum.photos/100/100?random=2', type: 'Artist', location: 'Delhi', bio: 'Digital Illustrator', followers: 250, following: 10, followingIds: [], friends: [], friendRequests: [], sentRequests: [], blockedUsers: [] }
 ];
 
 const SEED_POSTS: Post[] = [

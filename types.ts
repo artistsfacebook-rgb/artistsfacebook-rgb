@@ -11,7 +11,37 @@ export interface User {
   isOnline?: boolean;
   followers?: number;
   following?: number;
-  followingIds: string[]; // Array of user IDs this user follows
+  followingIds: string[]; 
+  
+  // New Friend System
+  friends: string[]; 
+  friendRequests: string[]; 
+  sentRequests: string[]; 
+  
+  // Privacy & Security
+  blockedUsers: string[]; // IDs of users blocked by this user
+  isVerified?: boolean;
+  privacySettings?: {
+      profileVisibility: 'Public' | 'Friends' | 'Private';
+      showOnlineStatus: boolean;
+      allowTagging: boolean;
+  };
+
+  // Notification Settings
+  notificationSettings?: {
+      emailNotifications: boolean;
+      pushNotifications: boolean;
+      types: {
+          likes: boolean;
+          comments: boolean;
+          follows: boolean;
+          mentions: boolean;
+          liveEvents: boolean;
+          friendRequests: boolean;
+          groups: boolean;
+      }
+  };
+
   worksAt?: string;
   website?: string;
   portfolio?: PortfolioItem[];
@@ -19,6 +49,7 @@ export interface User {
 
 export interface PortfolioItem {
   id: string;
+  userId: string;
   title: string;
   description: string;
   mediaUrl: string;
@@ -33,6 +64,22 @@ export interface Comment {
   user: User;
   text: string;
   timestamp: number;
+  parentId?: string; 
+  replies?: Comment[];
+}
+
+export type ReactionType = 'LIKE' | 'LOVE' | 'HAHA' | 'WOW' | 'SAD' | 'ANGRY';
+
+export interface Reaction {
+    id: string;
+    userId: string;
+    type: ReactionType;
+}
+
+export interface PollOption {
+    id: string;
+    text: string;
+    votes: string[]; 
 }
 
 export interface Post {
@@ -42,13 +89,24 @@ export interface Post {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  likes: number;
+  likes: number; 
+  reactions?: Reaction[]; 
   comments: Comment[];
   shares?: number;
   timestamp: number;
   tags: string[];
   isEdited?: boolean;
   visibility: 'Public' | 'Friends' | 'Private';
+  
+  originalPostId?: string;
+  originalPost?: Post;
+
+  pollQuestion?: string;
+  pollOptions?: PollOption[];
+  
+  groupId?: string;
+  pageId?: string;
+  eventId?: string;
 }
 
 export interface Story {
@@ -56,10 +114,20 @@ export interface Story {
   userId: string;
   user: User;
   imageUrl?: string;
-  videoUrl?: string; // Added for video stories
-  duration?: number; // Duration in milliseconds
+  videoUrl?: string;
+  duration?: number;
   isViewed: boolean;
   timestamp: number;
+  
+  viewers?: string[]; 
+  privacy?: 'Public' | 'Friends';
+  filter?: string; 
+  textOverlay?: {
+      text: string;
+      color: string;
+      yPosition: number;
+  };
+  musicTrack?: string;
 }
 
 export interface Reel {
@@ -78,11 +146,15 @@ export interface Reel {
 
 export interface Notification {
   id: string;
-  type: 'LIKE' | 'COMMENT' | 'FOLLOW' | 'MENTION';
-  user: User;
+  type: 'LIKE' | 'COMMENT' | 'FOLLOW' | 'MENTION' | 'LIVE' | 'FRIEND_REQ' | 'FRIEND_ACCEPT' | 'GROUP_INVITE' | 'MESSAGE';
+  userId: string; 
+  actorId: string; 
+  actorName: string;
+  actorAvatar: string;
   text: string;
-  time: string;
+  time: number;
   read: boolean;
+  link?: string;
 }
 
 export interface Studio {
@@ -111,8 +183,12 @@ export interface Group {
   name: string;
   coverImage: string;
   memberCount: number;
-  privacy: 'Public' | 'Private';
+  privacy: 'Public' | 'Private' | 'Secret';
   description: string;
+  creatorId: string;
+  admins: string[];
+  members: string[];
+  joinRequests: string[]; 
 }
 
 export interface Page {
@@ -134,6 +210,7 @@ export interface Event {
   interestedCount: number;
   type: 'Online' | 'In-Person';
   host: string;
+  groupId?: string;
 }
 
 export interface LiveStream {
@@ -143,6 +220,74 @@ export interface LiveStream {
   viewers: number;
   isLive: boolean;
   thumbnail: string;
+  videoUrl?: string;
+  recordingUrl?: string;
+  startedAt?: number;
+  endedAt?: number;
+  privacy: 'Public' | 'Private';
+}
+
+export interface Chat {
+  id: string;
+  type: 'individual' | 'group';
+  name?: string; 
+  image?: string; 
+  participantIds: string[];
+  participants?: User[]; 
+  lastMessage?: Message;
+  unreadCount?: number;
+  updatedAt: number;
+}
+
+export interface Message {
+  id: string;
+  chatId: string;
+  senderId: string;
+  content: string; 
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'file';
+  timestamp: number;
+  readBy: string[]; 
+  reactions?: Record<string, string>; 
+  replyToId?: string;
+  isSender?: boolean; 
+  status?: 'sent' | 'delivered' | 'read'; 
+}
+
+export interface AdCampaign {
+  id: string;
+  userId: string;
+  name: string;
+  budget: number;
+  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+  startDate: number;
+  endDate?: number;
+}
+
+export interface Ad {
+  id: string;
+  campaignId: string;
+  userId: string;
+  title: string;
+  content: string;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  ctaLink: string;
+  ctaText: string; 
+  impressions: number;
+  clicks: number;
+  spend: number;
+  user?: User; 
+}
+
+export interface Report {
+    id: string;
+    reporterId: string;
+    targetId: string; // User ID, Post ID, etc.
+    targetType: 'USER' | 'POST' | 'GROUP' | 'COMMENT';
+    reason: string;
+    status: 'PENDING' | 'RESOLVED' | 'DISMISSED';
+    timestamp: number;
 }
 
 export enum ViewState {
@@ -154,5 +299,9 @@ export enum ViewState {
   GROUPS = 'GROUPS',
   PAGES = 'PAGES',
   EVENTS = 'EVENTS',
-  LIVE = 'LIVE'
+  LIVE = 'LIVE',
+  MESSENGER = 'MESSENGER',
+  ADS_MANAGER = 'ADS_MANAGER',
+  SEARCH = 'SEARCH',
+  PRIVACY = 'PRIVACY'
 }

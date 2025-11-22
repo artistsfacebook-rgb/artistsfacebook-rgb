@@ -11,21 +11,21 @@ import Groups from './components/Groups';
 import Pages from './components/Pages';
 import Events from './components/Events';
 import LiveStreamComponent from './components/LiveStream';
+import Messenger from './components/Messenger';
+import AdsManager from './components/AdsManager';
+import SearchResults from './components/SearchResults';
+import PrivacyCenter from './components/PrivacyCenter';
 import { ViewState, User } from './types';
 import { saveUser } from './services/storage';
 
 const MainApp: React.FC = () => {
   const { user: currentUser, session } = useAuth();
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.FEED);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const handleUserUpdate = async (updatedUser: User) => {
     try {
-      // In AuthContext we might need a setUser method, but for now relying on local mutation + save
-      // The best practice is to update DB then let subscription update state, but for instant feedback:
-      // We can't easily update context state from here without exposing setter.
-      // But saving to DB will eventually trigger updates if real-time.
       await saveUser(updatedUser);
-      // Force reload to reflect changes if context doesn't auto-update from save
       window.location.reload(); 
     } catch (e) {
       console.error("Failed to save user data", e);
@@ -33,7 +33,6 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // We handle follow toggles by updating the current user object and saving it
   const handleToggleFollow = async (targetUserId: string) => {
     if (!currentUser) return;
     
@@ -57,11 +56,14 @@ const MainApp: React.FC = () => {
       };
 
       await saveUser(updatedUser);
-      // Triggering a reload is crude but effective for this architecture
-      // Ideally AuthContext provides a `updateProfile` method
     } catch (e) {
       console.error("Error toggling follow", e);
     }
+  };
+
+  const handleSearch = (query: string) => {
+      setSearchQuery(query);
+      setCurrentView(ViewState.SEARCH);
   };
 
   if (!currentUser) {
@@ -86,6 +88,14 @@ const MainApp: React.FC = () => {
         return <Events />;
       case ViewState.LIVE:
         return <LiveStreamComponent />;
+      case ViewState.MESSENGER:
+        return <Messenger />;
+      case ViewState.ADS_MANAGER:
+        return <AdsManager />;
+      case ViewState.SEARCH:
+        return <SearchResults query={searchQuery} />;
+      case ViewState.PRIVACY:
+        return <PrivacyCenter />;
       case ViewState.WATCH:
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-500">
@@ -106,6 +116,7 @@ const MainApp: React.FC = () => {
       currentView={currentView} 
       setCurrentView={setCurrentView} 
       currentUser={currentUser}
+      onSearch={handleSearch}
     >
       {renderContent()}
     </Layout>
