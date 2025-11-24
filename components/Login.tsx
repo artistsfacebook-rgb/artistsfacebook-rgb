@@ -283,6 +283,21 @@ alter table public.groups enable row level security;
 create policy "Everyone can view public groups" on public.groups for select using (true);
 create policy "Users can create/update groups" on public.groups for all using (true);
 
+-- GROUP FILES TABLE
+create table if not exists public.group_files (
+  id text primary key,
+  "groupId" text references public.groups(id),
+  "userId" text references public.users(id),
+  name text,
+  url text,
+  type text,
+  size numeric,
+  timestamp numeric
+);
+alter table public.group_files enable row level security;
+create policy "Members can view files" on public.group_files for select using (true);
+create policy "Members can upload files" on public.group_files for insert with check (true);
+
 -- PAGES TABLE
 create table if not exists public.pages (
   id text primary key,

@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { Studio } from '../types';
-import { MapPin, Star, Clock, Wifi, Music, Mic2, Search, CheckCircle } from 'lucide-react';
-import { getStudioRecommendation } from '../services/geminiService';
+import { MapPin, Star, Search, Map } from 'lucide-react';
+import { searchStudiosWithMaps, getStudioRecommendation } from '../services/geminiService';
 
 const STUDIOS: Studio[] = [
   {
@@ -40,12 +40,34 @@ const STUDIOS: Studio[] = [
 const StudioBooking: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [aiTip, setAiTip] = useState<string | null>(null);
+  const [mapsResults, setMapsResults] = useState<any[]>([]);
+  const [isSearchingMaps, setIsSearchingMaps] = useState(false);
 
   const handleSearch = async () => {
       if (searchTerm.length > 3) {
           const tip = await getStudioRecommendation(searchTerm);
           setAiTip(tip);
       }
+  };
+
+  const handleMapsSearch = async () => {
+      if (!searchTerm.trim()) return;
+      setIsSearchingMaps(true);
+      const { text, chunks } = await searchStudiosWithMaps(searchTerm);
+      
+      // Process chunks to display
+      const results = chunks.map((chunk: any, index: number) => ({
+          id: `map_${index}`,
+          name: chunk.web?.title || "Studio Result",
+          location: chunk.web?.uri || "Location from Maps",
+          description: text.slice(0, 100) + "...", // Fallback snippet
+          link: chunk.web?.uri
+      }));
+      
+      // If we have structured web data, use it, otherwise show the text summary
+      setAiTip(text); 
+      setMapsResults(results);
+      setIsSearchingMaps(false);
   };
 
   const filteredStudios = STUDIOS.filter(s => 
@@ -61,20 +83,39 @@ const StudioBooking: React.FC = () => {
             <h2 className="text-3xl font-bold mb-2 text-white">Book Professional Studios</h2>
             <p className="text-blue-100 mb-6">Find the perfect space for your next masterpiece or recording session.</p>
             
-            <div className="flex max-w-md mx-auto bg-white rounded-full overflow-hidden shadow-md">
+            <div className="flex flex-col md:flex-row gap-2 max-w-2xl mx-auto bg-white rounded-xl p-2 shadow-md">
                 <input 
                     type="text" 
                     placeholder="Search by city or studio name..." 
-                    className="flex-1 px-6 py-3 bg-transparent focus:outline-none text-gray-900 placeholder-gray-500"
+                    className="flex-1 px-4 py-2 bg-transparent focus:outline-none text-gray-900 placeholder-gray-500"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onBlur={handleSearch}
                 />
-                <button className="bg-purple-600 px-6 hover:bg-purple-700 transition-colors text-white flex items-center justify-center">
-                    <Search size={20} />
-                </button>
+                <div className="flex gap-1">
+                    <button onClick={handleSearch} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <Search size={18} /> Local
+                    </button>
+                    <button onClick={handleMapsSearch} disabled={isSearchingMaps} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-70">
+                        {isSearchingMaps ? 'Searching...' : <><Map size={18} /> Google Maps</>}
+                    </button>
+                </div>
             </div>
-            {aiTip && <p className="text-xs text-blue-200 mt-3 italic">✨ AI Insight: {aiTip}</p>}
+            {aiTip && <div className="bg-white/10 backdrop-blur-sm mt-4 p-3 rounded-lg text-blue-100 text-sm text-left"><strong className="text-yellow-300">Gemini Info:</strong> {aiTip}</div>}
+            
+            {mapsResults.length > 0 && (
+                <div className="mt-4 bg-white rounded-xl p-4 text-left shadow-lg">
+                    <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2"><Map size={16} /> Live Results from Google Maps</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {mapsResults.map(res => (
+                            <div key={res.id} className="p-2 border border-gray-100 rounded hover:bg-gray-50">
+                                <a href={res.link} target="_blank" rel="noreferrer" className="font-bold text-blue-600 hover:underline block">{res.name}</a>
+                                <p className="text-xs text-gray-500 truncate">{res.location}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
       </div>
 

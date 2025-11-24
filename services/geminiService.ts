@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // Initialize the Gemini API client
 // The API key must be provided via the process.env.API_KEY environment variable.
@@ -26,6 +26,146 @@ export const generateCreativeCaption = async (draft: string): Promise<string> =>
 };
 
 /**
+ * Analyzes an uploaded image to generate a caption and tags.
+ */
+export const analyzeImageForPost = async (base64Image: string): Promise<{ caption: string, tags: string[] }> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: base64Image.split(',')[1]
+          }
+        },
+        {
+          text: "Analyze this artwork. Provide a creative, engaging social media caption describing the style, mood, and content. Also provide 5-8 relevant hashtags (space separated, no # symbols)."
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            caption: { type: Type.STRING },
+            tags: { type: Type.STRING } 
+          }
+        }
+      }
+    });
+
+    const result = JSON.parse(response.text || '{}');
+    const tags = result.tags ? (result.tags as string).split(' ') : [];
+    return { caption: result.caption || '', tags };
+  } catch (error) {
+    console.error("Error analyzing image:", error);
+    return { caption: '', tags: [] };
+  }
+};
+
+/**
+ * Generates a video using Veo model.
+ */
+export const generateVeoVideo = async (prompt: string, aspectRatio: '16:9' | '9:16' = '16:9'): Promise<string | null> => {
+  try {
+    // API Key check for Veo models
+    // @ts-ignore
+    if (window.aistudio && window.aistudio.hasSelectedApiKey && !(await window.aistudio.hasSelectedApiKey())) {
+       // @ts-ignore
+       await window.aistudio.openSelectKey();
+       // Race condition mitigation: assume success if dialog closes
+    }
+
+    // Create a fresh client to pick up the potentially new key
+    const veoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    console.log("Starting video generation with Veo...");
+    let operation = await veoAi.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: prompt,
+      config: {
+        numberOfVideos: 1,
+        resolution: '1080p',
+        aspectRatio: aspectRatio
+      }
+    });
+
+    // Poll for completion
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s
+      console.log("Polling video status...");
+      operation = await veoAi.operations.getVideosOperation({operation: operation});
+    }
+
+    const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (!videoUri) return null;
+
+    // Fetch the actual video bytes
+    const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+
+  } catch (error) {
+    console.error("Error generating video:", error);
+    if (typeof error === 'object' && error !== null && 'message' in error && (error as any).message.includes("Requested entity was not found")) {
+        // Reset key if needed
+        // @ts-ignore
+        if (window.aistudio && window.aistudio.openSelectKey) await window.aistudio.openSelectKey();
+    }
+    return null;
+  }
+};
+
+/**
+ * Search for studios using Google Maps Grounding
+ */
+export const searchStudiosWithMaps = async (location: string): Promise<{ text: string, chunks: any[] }> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Find top rated art studios, recording studios, or creative spaces in ${location}. Provide their names, a brief description, and rating if available.`,
+      config: {
+        tools: [{ googleMaps: {} }],
+      },
+    });
+    
+    return {
+      text: response.text || "No results found.",
+      chunks: (response.candidates?.[0]?.groundingMetadata?.groundingChunks as any[]) || []
+    };
+  } catch (error) {
+    console.error("Error searching with Maps:", error);
+    return { text: "Error searching maps.", chunks: [] };
+  }
+};
+
+/**
+ * Suggests relevant hashtags based on post content.
+ */
+export const suggestHashtags = async (content: string): Promise<string[]> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Analyze the following text and extract or generate 5-8 relevant, high-traffic hashtags for an art community.
+      Return only the tags separated by spaces (e.g. "oilpainting digitalart sketch"). Do not include the hash symbol (#).
+      
+      Text: "${content}"`,
+    });
+    
+    const raw = response.text || '';
+    const tags: string[] = raw.split(/\s+/)
+      .map((t: string) => t.replace(/[^a-zA-Z0-9_]/g, ''))
+      .filter((t: string) => t.length > 0);
+      
+    return [...new Set(tags)].slice(0, 8);
+  } catch (error) {
+    console.error("Error generating hashtags:", error);
+    return [];
+  }
+};
+
+/**
  * Provides an AI critique or appreciation for a post context.
  */
 export const getArtCritique = async (postContent: string, artistName: string): Promise<string> => {
@@ -45,8 +185,7 @@ export const getArtCritique = async (postContent: string, artistName: string): P
 };
 
 /**
- * Search for studios helper (simulated mostly, but could use grounding if needed).
- * For this demo, we will use Gemini to generate a "Studio Recommendation" description based on location.
+ * Search for studios helper (legacy/simulated).
  */
 export const getStudioRecommendation = async (location: string): Promise<string> => {
    try {

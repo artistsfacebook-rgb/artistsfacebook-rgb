@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LiveStream } from '../types';
 import { Video, Users, Heart, MessageCircle, Send, X, Radio, Mic, MicOff, VideoOff, Pause, Play, Square, Lock, Trash2, Ban, ShieldAlert, ChevronDown, Clock, History } from 'lucide-react';
@@ -154,7 +153,7 @@ const LiveStreamComponent: React.FC = () => {
     } else {
         stopStream();
     }
-    return () => stopStream();
+    return () => { stopStream(); };
   }, [isBroadcasting]);
 
   const stopStream = async () => {

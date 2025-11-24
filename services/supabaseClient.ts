@@ -21,7 +21,13 @@ const isValidKey = (key: string) => key && key.length > 20;
 export const isSupabaseConfigured = isValidUrl(SUPABASE_URL) && isValidKey(SUPABASE_KEY);
 
 export const supabase = isSupabaseConfigured 
-  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: true, // Ensures user stays logged in
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
   : createClient('https://placeholder.supabase.co', 'placeholder');
 
 export const configureBackend = (url: string, key: string) => {

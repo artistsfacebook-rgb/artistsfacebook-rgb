@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Group, User } from '../types';
-import { Users, Search, Plus, Globe, Lock, Wand2, MoreHorizontal, UserPlus, Shield, LogOut, CheckCircle, XCircle, Grid, FileText, Calendar } from 'lucide-react';
+import { Group, User, GroupFile, Event } from '../types';
+import { Users, Search, Plus, Globe, Lock, Wand2, MoreHorizontal, UserPlus, Shield, LogOut, CheckCircle, XCircle, Grid, FileText, Calendar, Upload, Download, Trash2, X } from 'lucide-react';
 import { generateDescription } from '../services/geminiService';
-import { getGroups, saveGroup, joinGroup, leaveGroup, approveJoinRequest, getUser } from '../services/storage';
+import { getGroups, saveGroup, joinGroup, leaveGroup, approveJoinRequest, getUser, uploadGroupFile, getGroupFiles, removeGroupMember, getEvents } from '../services/storage';
 import { useAuth } from '../contexts/AuthContext';
 import Feed from './Feed';
 
@@ -20,9 +20,11 @@ const Groups: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Detail View State
-  const [activeTab, setActiveTab] = useState<'DISCUSSION' | 'MEMBERS' | 'EVENTS' | 'ADMIN'>('DISCUSSION');
+  const [activeTab, setActiveTab] = useState<'DISCUSSION' | 'MEMBERS' | 'EVENTS' | 'FILES' | 'ADMIN'>('DISCUSSION');
   const [memberProfiles, setMemberProfiles] = useState<User[]>([]);
   const [requestProfiles, setRequestProfiles] = useState<User[]>([]);
+  const [groupFiles, setGroupFiles] = useState<GroupFile[]>([]);
+  const [groupEvents, setGroupEvents] = useState<Event[]>([]);
 
   useEffect(() => {
       const load = async () => {
@@ -32,21 +34,34 @@ const Groups: React.FC = () => {
       load();
   }, [selectedGroup]); // Reload when switching back to list
 
-  // Load member profiles when opening Members or Admin tab
+  // Load dependent data
   useEffect(() => {
-      if (selectedGroup && (activeTab === 'MEMBERS' || activeTab === 'ADMIN')) {
+      if (!selectedGroup || !user) return;
+
+      if (activeTab === 'MEMBERS' || activeTab === 'ADMIN') {
           const loadProfiles = async () => {
               const members = await Promise.all(selectedGroup.members.map(id => getUser(id)));
               setMemberProfiles(members.filter(Boolean) as User[]);
               
-              if (selectedGroup.admins.includes(user?.id || '')) {
+              if (selectedGroup.admins.includes(user.id)) {
                   const requests = await Promise.all((selectedGroup.joinRequests || []).map(id => getUser(id)));
                   setRequestProfiles(requests.filter(Boolean) as User[]);
               }
           };
           loadProfiles();
       }
-  }, [selectedGroup, activeTab, user?.id]);
+
+      if (activeTab === 'FILES') {
+          getGroupFiles(selectedGroup.id).then(setGroupFiles);
+      }
+
+      if (activeTab === 'EVENTS') {
+          getEvents().then(events => {
+              setGroupEvents(events.filter(e => e.groupId === selectedGroup.id));
+          });
+      }
+
+  }, [selectedGroup, activeTab, user]);
 
   const handleGenerateDesc = async () => {
     if (!newGroupName) return;
@@ -95,6 +110,12 @@ const Groups: React.FC = () => {
       setSelectedGroup(null);
   };
 
+  const handleRemoveMember = async (memberId: string) => {
+      if (!selectedGroup || !confirm("Remove this member?")) return;
+      await removeGroupMember(selectedGroup.id, memberId);
+      setMemberProfiles(prev => prev.filter(m => m.id !== memberId));
+  };
+
   const handleApproveRequest = async (reqUserId: string) => {
       if (!selectedGroup) return;
       await approveJoinRequest(selectedGroup.id, reqUserId);
@@ -102,6 +123,27 @@ const Groups: React.FC = () => {
       setRequestProfiles(prev => prev.filter(u => u.id !== reqUserId));
       const updated = await getGroups();
       setSelectedGroup(updated.find(g => g.id === selectedGroup.id) || null);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files?.[0] || !selectedGroup || !user) return;
+      const file = e.target.files[0];
+      
+      // Simulate upload
+      const newFile: GroupFile = {
+          id: `f${Date.now()}`,
+          groupId: selectedGroup.id,
+          userId: user.id,
+          user: user,
+          name: file.name,
+          url: '#', // Mock URL
+          type: file.name.split('.').pop() || 'file',
+          size: file.size,
+          timestamp: Date.now()
+      };
+      
+      await uploadGroupFile(newFile);
+      setGroupFiles([newFile, ...groupFiles]);
   };
 
   if (selectedGroup) {
@@ -151,7 +193,7 @@ const Groups: React.FC = () => {
                   </div>
 
                   {/* Tabs */}
-                  <div className="flex gap-6 mt-6 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                  <div className="flex gap-6 mt-6 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
                       {['DISCUSSION', 'MEMBERS', 'EVENTS', 'FILES'].map(t => (
                           <button 
                              key={t} 
@@ -200,12 +242,19 @@ const Groups: React.FC = () => {
                           <h3 className="font-bold text-lg mb-4">Members ({selectedGroup.memberCount})</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {memberProfiles.map(m => (
-                                  <div key={m.id} className="flex items-center gap-3 p-2 border border-gray-100 dark:border-gray-700 rounded-lg">
-                                      <img src={m.avatar} className="w-12 h-12 rounded-full" />
-                                      <div>
-                                          <div className="font-bold text-sm">{m.name}</div>
-                                          <div className="text-xs text-gray-500">{selectedGroup.admins.includes(m.id) ? 'Admin' : 'Member'}</div>
+                                  <div key={m.id} className="flex items-center justify-between p-2 border border-gray-100 dark:border-gray-700 rounded-lg">
+                                      <div className="flex items-center gap-3">
+                                          <img src={m.avatar} className="w-12 h-12 rounded-full" />
+                                          <div>
+                                              <div className="font-bold text-sm dark:text-white">{m.name}</div>
+                                              <div className="text-xs text-gray-500">{selectedGroup.admins.includes(m.id) ? 'Admin' : 'Member'}</div>
+                                          </div>
                                       </div>
+                                      {isAdmin && m.id !== user?.id && (
+                                          <button onClick={() => handleRemoveMember(m.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full">
+                                              <Trash2 size={16} />
+                                          </button>
+                                      )}
                                   </div>
                               ))}
                           </div>
@@ -216,14 +265,14 @@ const Groups: React.FC = () => {
                       <div className="max-w-3xl mx-auto space-y-6">
                           {/* Join Requests */}
                           <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm p-4">
-                              <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><UserPlus /> Member Requests ({requestProfiles.length})</h3>
+                              <h3 className="font-bold text-lg mb-4 flex items-center gap-2 dark:text-white"><UserPlus /> Member Requests ({requestProfiles.length})</h3>
                               {requestProfiles.length === 0 ? <p className="text-gray-500">No pending requests.</p> : (
                                   <div className="space-y-3">
                                       {requestProfiles.map(req => (
                                           <div key={req.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                               <div className="flex items-center gap-3">
                                                   <img src={req.avatar} className="w-10 h-10 rounded-full" />
-                                                  <span className="font-bold">{req.name}</span>
+                                                  <span className="font-bold dark:text-white">{req.name}</span>
                                               </div>
                                               <div className="flex gap-2">
                                                   <button onClick={() => handleApproveRequest(req.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold">Approve</button>
@@ -237,14 +286,14 @@ const Groups: React.FC = () => {
                           
                           {/* Settings */}
                           <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm p-4">
-                              <h3 className="font-bold text-lg mb-4">Group Settings</h3>
+                              <h3 className="font-bold text-lg mb-4 dark:text-white">Group Settings</h3>
                               <div className="space-y-2">
-                                  <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                      <span>Edit Name & Description</span>
+                                  <div className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                      <span className="dark:text-white">Edit Name & Description</span>
                                       <MoreHorizontal size={16} />
                                   </div>
-                                  <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                      <span>Privacy Settings</span>
+                                  <div className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                      <span className="dark:text-white">Privacy Settings</span>
                                       <span className="text-sm text-gray-500">{selectedGroup.privacy}</span>
                                   </div>
                               </div>
@@ -253,17 +302,70 @@ const Groups: React.FC = () => {
                   )}
                   
                   {activeTab === 'EVENTS' && (
-                      <div className="text-center py-10 text-gray-500">
-                          <Calendar size={48} className="mx-auto mb-4 opacity-50" />
-                          <p>No upcoming events.</p>
-                          <button className="mt-4 text-blue-600 font-bold hover:underline">Create Event</button>
+                      <div className="max-w-3xl mx-auto">
+                          <div className="flex justify-between items-center mb-4">
+                              <h3 className="font-bold text-lg dark:text-white">Upcoming Events</h3>
+                              <button className="text-blue-600 text-sm font-bold">+ Create Event</button>
+                          </div>
+                          {groupEvents.length === 0 ? (
+                              <div className="text-center py-10 text-gray-500">
+                                  <Calendar size={48} className="mx-auto mb-4 opacity-50" />
+                                  <p>No upcoming events for this group.</p>
+                              </div>
+                          ) : (
+                              <div className="space-y-4">
+                                  {groupEvents.map(ev => (
+                                      <div key={ev.id} className="bg-white dark:bg-[#242526] p-4 rounded-xl shadow-sm flex gap-4">
+                                          <div className="bg-red-100 dark:bg-red-900/30 text-red-600 p-3 rounded-lg text-center min-w-[60px]">
+                                              <div className="text-xs font-bold">{ev.date.split(' ')[0]}</div>
+                                              <div className="text-xl font-bold">{ev.date.split(' ')[1]}</div>
+                                          </div>
+                                          <div>
+                                              <h4 className="font-bold text-lg dark:text-white">{ev.title}</h4>
+                                              <p className="text-sm text-gray-500">{ev.location}</p>
+                                              <p className="text-xs text-gray-400 mt-1">{ev.interestedCount} interested</p>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
                       </div>
                   )}
                   
                    {activeTab === 'FILES' && (
-                      <div className="text-center py-10 text-gray-500">
-                          <FileText size={48} className="mx-auto mb-4 opacity-50" />
-                          <p>No files shared yet.</p>
+                      <div className="max-w-3xl mx-auto">
+                          <div className="flex justify-between items-center mb-4">
+                              <h3 className="font-bold text-lg dark:text-white">Files</h3>
+                              <label className="bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer">
+                                  <Upload size={16} /> Upload File
+                                  <input type="file" className="hidden" onChange={handleFileUpload} />
+                              </label>
+                          </div>
+                          {groupFiles.length === 0 ? (
+                              <div className="text-center py-10 text-gray-500">
+                                  <FileText size={48} className="mx-auto mb-4 opacity-50" />
+                                  <p>No files shared yet.</p>
+                              </div>
+                          ) : (
+                              <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm overflow-hidden">
+                                  {groupFiles.map(file => (
+                                      <div key={file.id} className="flex items-center justify-between p-3 border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-slate-700">
+                                          <div className="flex items-center gap-3">
+                                              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded">
+                                                  <FileText size={20} className="text-blue-600" />
+                                              </div>
+                                              <div>
+                                                  <div className="font-bold text-sm dark:text-white">{file.name}</div>
+                                                  <div className="text-xs text-gray-500">{file.user?.name} • {new Date(file.timestamp).toLocaleDateString()}</div>
+                                              </div>
+                                          </div>
+                                          <button className="text-gray-500 hover:text-blue-600">
+                                              <Download size={18} />
+                                          </button>
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
                       </div>
                   )}
               </div>

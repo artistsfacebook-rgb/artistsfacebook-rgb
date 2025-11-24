@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Image, Wand2, Video, Smile, Hash, X, Globe, Users, Lock, ChevronDown, BarChart2 } from 'lucide-react';
-import { generateCreativeCaption } from '../services/geminiService';
+import { Image, Wand2, Video, Smile, Hash, X, Globe, Users, Lock, ChevronDown, BarChart2, Film, Loader } from 'lucide-react';
+import { generateCreativeCaption, suggestHashtags, generateVeoVideo, analyzeImageForPost } from '../services/geminiService';
 import { User, PollOption } from '../types';
 
 interface CreatePostProps {
@@ -48,11 +48,49 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
   const [showPoll, setShowPoll] = useState(false);
   const [pollOptions, setPollOptions] = useState(['', '']);
 
+  // Video Generation State
+  const [showVideoGen, setShowVideoGen] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState('');
+  const [videoAspectRatio, setVideoAspectRatio] = useState<'16:9' | '9:16'>('16:9');
+
   const handleGenerateCaption = async () => {
     if (!content.trim()) return;
     setIsGenerating(true);
     const caption = await generateCreativeCaption(content);
     setContent(caption);
+    setIsGenerating(false);
+  };
+
+  const handleAutoTags = async () => {
+    if (!content.trim()) return;
+    setIsGenerating(true);
+    const suggested = await suggestHashtags(content);
+    setTags(prev => Array.from(new Set([...prev, ...suggested])));
+    setIsGenerating(false);
+    setShowTagInput(true);
+  };
+
+  const handleAnalyzeImage = async () => {
+    if (!selectedImage) return;
+    setIsGenerating(true);
+    const { caption, tags: aiTags } = await analyzeImageForPost(selectedImage);
+    if (caption) setContent(prev => prev ? prev + "\n\n" + caption : caption);
+    if (aiTags && aiTags.length > 0) setTags(prev => Array.from(new Set([...prev, ...aiTags])));
+    setIsGenerating(false);
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!videoPrompt.trim()) return;
+    setIsGenerating(true);
+    const videoUrl = await generateVeoVideo(videoPrompt, videoAspectRatio);
+    if (videoUrl) {
+        setSelectedVideo(videoUrl);
+        setSelectedImage(undefined);
+        setShowVideoGen(false);
+        setContent(prev => prev || videoPrompt); // Set prompt as caption if empty
+    } else {
+        alert("Video generation failed. Please try again.");
+    }
     setIsGenerating(false);
   };
 
@@ -150,6 +188,37 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
                  </div>
              )}
 
+             {/* Video Gen Modal */}
+             {showVideoGen && (
+                 <div className="mt-3 bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                     <h4 className="text-sm font-bold mb-2 flex items-center gap-2"><Film size={16}/> Generate Video (Veo)</h4>
+                     <textarea 
+                        value={videoPrompt}
+                        onChange={(e) => setVideoPrompt(e.target.value)}
+                        placeholder="Describe the video you want to create (e.g. A futuristic art studio with neon lights)"
+                        className="w-full p-2 rounded border border-gray-300 dark:border-slate-600 text-sm mb-2"
+                        rows={2}
+                     />
+                     <div className="flex items-center gap-2 mb-3">
+                         <span className="text-xs font-bold">Aspect Ratio:</span>
+                         <select 
+                            value={videoAspectRatio} 
+                            onChange={(e: any) => setVideoAspectRatio(e.target.value)}
+                            className="text-xs p-1 rounded border"
+                         >
+                             <option value="16:9">Landscape (16:9)</option>
+                             <option value="9:16">Portrait (9:16)</option>
+                         </select>
+                     </div>
+                     <div className="flex gap-2">
+                         <button onClick={handleGenerateVideo} disabled={isGenerating || !videoPrompt} className="bg-purple-600 text-white px-3 py-1 rounded text-xs font-bold disabled:opacity-50 flex items-center gap-1">
+                             {isGenerating ? <Loader className="animate-spin" size={12}/> : <Wand2 size={12}/>} Generate
+                         </button>
+                         <button onClick={() => setShowVideoGen(false)} className="bg-gray-200 text-black px-3 py-1 rounded text-xs font-bold">Cancel</button>
+                     </div>
+                 </div>
+             )}
+
              {tags.length > 0 && (
                <div className="flex flex-wrap gap-2 mt-2 pl-1">
                  {tags.map(tag => (
@@ -171,13 +240,18 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
       {selectedImage && (
         <div className="mb-3 relative group rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
             <img src={selectedImage} alt="Preview" className="max-h-80 w-full object-cover" />
-            <button onClick={() => setSelectedImage(undefined)} className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-500"><X size={20} /></button>
+            <div className="absolute top-2 right-2 flex gap-2">
+                <button onClick={handleAnalyzeImage} disabled={isGenerating} className="bg-white/90 text-purple-600 p-2 rounded-full shadow-sm text-xs font-bold flex items-center gap-1 hover:bg-white">
+                    {isGenerating ? <Loader className="animate-spin" size={14}/> : <Wand2 size={14}/>} Analyze
+                </button>
+                <button onClick={() => setSelectedImage(undefined)} className="bg-white rounded-full p-2 text-gray-500 hover:text-red-500"><X size={20} /></button>
+            </div>
         </div>
       )}
       {selectedVideo && (
         <div className="mb-3 relative group rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 bg-black">
             <video src={selectedVideo} controls className="max-h-80 w-full" />
-            <button onClick={() => setSelectedVideo(undefined)} className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-500"><X size={20} /></button>
+            <button onClick={() => setSelectedVideo(undefined)} className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-500 hover:text-red-500"><X size={20} /></button>
         </div>
       )}
 
@@ -197,19 +271,28 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onPostCreate }) => {
                      )}
                  </div>
 
-                 <label className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors">
+                 <label className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors" title="Upload Photo/Video">
                     <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
                     <Image className="text-green-500" size={24} />
                  </label>
                  
-                 <button onClick={() => setShowPoll(!showPoll)} className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg ${showPoll ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                 <button onClick={() => setShowVideoGen(!showVideoGen)} className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg ${showVideoGen ? 'bg-purple-100 dark:bg-purple-900/20' : ''}`} title="Generate AI Video">
+                    <Film className="text-purple-600" size={24} />
+                 </button>
+
+                 <button onClick={() => setShowPoll(!showPoll)} className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg ${showPoll ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`} title="Create Poll">
                     <BarChart2 className="text-red-500" size={24} />
                  </button>
                  
                  <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"><Smile className="text-yellow-500" size={24} /></button>
                  <button onClick={() => setShowTagInput(!showTagInput)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"><Hash className="text-blue-500" size={24} /></button>
-                 <button onClick={handleGenerateCaption} disabled={isGenerating || !content.trim()} className="flex items-center gap-1 px-2 py-1 hover:bg-purple-50 rounded-lg text-xs text-purple-600 disabled:opacity-50">
-                    {isGenerating ? <span className="animate-spin">✨</span> : <Wand2 size={14} />} AI
+                 
+                 <button onClick={handleGenerateCaption} disabled={isGenerating || !content.trim()} className="flex items-center gap-1 px-2 py-1 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg text-xs text-purple-600 disabled:opacity-50 font-medium">
+                    {isGenerating ? <span className="animate-spin">✨</span> : <Wand2 size={14} />} Caption
+                 </button>
+                 
+                 <button onClick={handleAutoTags} disabled={isGenerating || !content.trim()} className="flex items-center gap-1 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg text-xs text-blue-600 disabled:opacity-50 font-medium ml-1">
+                    <Hash size={14} /> AI Tags
                  </button>
              </div>
              

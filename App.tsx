@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import Layout from './components/Layout';
 import Feed from './components/Feed';
 import StudioBooking from './components/StudioBooking';
@@ -15,6 +16,8 @@ import Messenger from './components/Messenger';
 import AdsManager from './components/AdsManager';
 import SearchResults from './components/SearchResults';
 import PrivacyCenter from './components/PrivacyCenter';
+import SavedPosts from './components/SavedPosts';
+import AdminDashboard from './components/AdminDashboard';
 import { ViewState, User } from './types';
 import { saveUser } from './services/storage';
 
@@ -35,7 +38,6 @@ const MainApp: React.FC = () => {
 
   const handleToggleFollow = async (targetUserId: string) => {
     if (!currentUser) return;
-    
     try {
       const isFollowing = currentUser.followingIds.includes(targetUserId);
       let newFollowingIds: string[];
@@ -96,13 +98,17 @@ const MainApp: React.FC = () => {
         return <SearchResults query={searchQuery} />;
       case ViewState.PRIVACY:
         return <PrivacyCenter />;
+      case ViewState.SAVED:
+        return <SavedPosts />;
+      case ViewState.ADMIN:
+        return <AdminDashboard />;
       case ViewState.WATCH:
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-500">
-                <div className="w-24 h-24 bg-gray-200 rounded-full mb-4 flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-500 dark:text-gray-400">
+                <div className="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full mb-4 flex items-center justify-center">
                      <span className="text-4xl">📺</span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Watch Page</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Watch Page</h2>
                 <p>Discover trending art videos and reels.</p>
             </div>
         );
@@ -126,7 +132,9 @@ const MainApp: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <MainApp />
+      <LanguageProvider>
+        <MainApp />
+      </LanguageProvider>
     </AuthProvider>
   );
 };

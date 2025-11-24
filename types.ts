@@ -60,6 +60,7 @@ export interface PortfolioItem {
 
 export interface Comment {
   id: string;
+  postId?: string;
   userId: string;
   user: User;
   text: string;
@@ -191,6 +192,18 @@ export interface Group {
   joinRequests: string[]; 
 }
 
+export interface GroupFile {
+  id: string;
+  groupId: string;
+  userId: string;
+  user?: User;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  timestamp: number;
+}
+
 export interface Page {
   id: string;
   name: string;
@@ -303,5 +316,7 @@ export enum ViewState {
   MESSENGER = 'MESSENGER',
   ADS_MANAGER = 'ADS_MANAGER',
   SEARCH = 'SEARCH',
-  PRIVACY = 'PRIVACY'
+  PRIVACY = 'PRIVACY',
+  SAVED = 'SAVED',
+  ADMIN = 'ADMIN'
 }

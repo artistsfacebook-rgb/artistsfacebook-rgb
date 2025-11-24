@@ -1,0 +1,47 @@
+
+export const translations = {
+  en: {
+    home: "Home",
+    watch: "Watch",
+    marketplace: "Marketplace",
+    groups: "Groups",
+    live: "Live",
+    pages: "Pages",
+    events: "Events",
+    saved: "Saved",
+    admin: "Admin Dashboard",
+    messenger: "Messenger",
+    searchPlaceholder: "Search Artists Facebook",
+    contacts: "Contacts",
+    sponsored: "Sponsored",
+    trending: "Trending",
+    privacy: "Privacy Center",
+    studios: "Studios",
+    ads: "Ads Manager",
+    darkMode: "Dark Mode",
+    lightMode: "Light Mode",
+    language: "Language"
+  },
+  hi: {
+    home: "होम",
+    watch: "वीडियो",
+    marketplace: "मार्केटप्लेस",
+    groups: "समूह",
+    live: "लाइव",
+    pages: "पेज",
+    events: "इवेंट्स",
+    saved: "सेव किया गया",
+    admin: "एडमिन डैशबोर्ड",
+    messenger: "मैसेंजर",
+    searchPlaceholder: "आर्टिस्ट फेसबुक खोजें",
+    contacts: "संपर्क",
+    sponsored: "प्रायोजित",
+    trending: "ट्रेंडिंग",
+    privacy: "गोपनीयता केंद्र",
+    studios: "स्टूडियो",
+    ads: "विज्ञापन प्रबंधक",
+    darkMode: "डार्क मोड",
+    lightMode: "लाइट मोड",
+    language: "भाषा"
+  }
+};
