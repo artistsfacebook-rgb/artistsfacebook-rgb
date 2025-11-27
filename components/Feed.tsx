@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Post, Story, Reel, Comment, User, LiveStream, ReactionType, PollOption, Ad } from '../types';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Sparkles, Video, Hash, XCircle, Edit2, Trash2, Save, Globe, Users, Lock, Plus, UserPlus, Send, Radio, Repeat, ExternalLink, Flag, UserX, AlertCircle, CornerDownRight, ArrowUp, Check } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Sparkles, Video, Hash, XCircle, Edit2, Trash2, Save, Globe, Users, Lock, Plus, UserPlus, Send, Radio, Repeat, ExternalLink, Flag, UserX, AlertCircle, CornerDownRight, ArrowUp, Check, X } from 'lucide-react';
 import CreatePost from './CreatePost';
 import StoryEditor from './StoryEditor';
 import { getArtCritique } from '../services/geminiService';
@@ -69,6 +70,9 @@ const Feed: React.FC<FeedProps> = ({ user, onToggleFollow, groupId, pageId, even
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<{commentId: string, userName: string} | null>(null);
   const [commentText, setCommentText] = useState('');
+
+  // Create Post Modal State
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
 
   // Editing State
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -160,7 +164,15 @@ const Feed: React.FC<FeedProps> = ({ user, onToggleFollow, groupId, pageId, even
               .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'post_reactions' }, (payload) => {
                   if (payload.new.userId === user.id) return; 
                   setPosts(current => current.map(p => {
-                      if (p.id === payload.new.postId) return { ...p, likes: p.likes + 1 };
+                      if (p.id === payload.new.postId) {
+                          const currentReactions = p.reactions || [];
+                          // Add the new reaction to local state
+                          return { 
+                              ...p, 
+                              likes: p.likes + 1,
+                              reactions: [...currentReactions, { id: payload.new.id, userId: payload.new.userId, type: payload.new.type }]
+                          };
+                      }
                       return p;
                   }));
               })
@@ -198,6 +210,7 @@ const Feed: React.FC<FeedProps> = ({ user, onToggleFollow, groupId, pageId, even
     };
     setPosts([newPost, ...posts]);
     savePosts([newPost]);
+    setShowCreatePostModal(false);
   };
 
   // --- EDIT POST LOGIC ---
@@ -446,7 +459,41 @@ const Feed: React.FC<FeedProps> = ({ user, onToggleFollow, groupId, pageId, even
               {groupId ? 'Group Discussion' : 'Page Feed'}
           </div>
       ) : (
-          <CreatePost user={user} onPostCreate={handlePostCreate} />
+          <>
+             {/* Desktop: Inline Create Post */}
+             <div className="hidden md:block">
+                 <CreatePost user={user} onPostCreate={handlePostCreate} />
+             </div>
+             
+             {/* Mobile: Button to Open Modal */}
+             <div className="md:hidden bg-white dark:bg-[#242526] p-4 rounded-xl mb-4 shadow-sm border border-[#DADDE1] dark:border-slate-700 flex items-center gap-3">
+                 <img src={user.avatar} className="w-10 h-10 rounded-full" />
+                 <button 
+                    onClick={() => setShowCreatePostModal(true)}
+                    className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2.5 text-left text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                 >
+                     What's on your mind?
+                 </button>
+                 <div className="text-green-500"><MessageCircle /></div>
+             </div>
+          </>
+      )}
+
+      {/* Create Post Modal (Mobile mainly) */}
+      {showCreatePostModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-[#242526] w-full max-w-lg rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                  <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-center w-full dark:text-white">Create Post</h3>
+                      <button onClick={() => setShowCreatePostModal(false)} className="p-2 bg-gray-100 dark:bg-slate-700 rounded-full absolute right-4 top-3">
+                          <X size={20} />
+                      </button>
+                  </div>
+                  <div className="p-4">
+                      <CreatePost user={user} onPostCreate={handlePostCreate} />
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* Feed */}

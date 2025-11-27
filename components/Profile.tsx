@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, PortfolioItem, Story } from '../types';
 import { MapPin, Briefcase, Link as LinkIcon, UserPlus, Camera, Edit, Grid, Image, Video, Plus, X, Save, Tag, Filter, Upload, UserCheck, Wand2, Lock, Globe, BadgeCheck, Shield, Eye, Bell, UserMinus, Check, MoreHorizontal, Mail, ChevronDown, AlignLeft } from 'lucide-react';
@@ -68,6 +69,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
   });
 
   const storyInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   
   // Friend System Data
@@ -174,6 +176,17 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
           }
       }
       e.target.value = '';
+  };
+
+  const handleDirectCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          try {
+             const compressed = await compressImage(file);
+             const updatedUser = { ...user, coverPhoto: compressed };
+             onUpdateUser(updatedUser);
+          } catch (err) { console.error(err); }
+      }
   };
 
   const handleGenerateAvatar = async () => {
@@ -286,12 +299,26 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
           friendRequests: (user.friendRequests || []).filter(id => id !== targetId)
       };
       onUpdateUser(u);
+      
+      // Update local lists immediately
+      const newFriend = allUsers.find(x => x.id === targetId);
+      if(newFriend) setFriendsList([...friendsList, newFriend]);
+      setFriendRequests(friendRequests.filter(x => x.id !== targetId));
   };
 
   const handleRejectRequest = async (targetId: string) => {
       await rejectFriendRequest(user, targetId);
       const u = { ...user, friendRequests: (user.friendRequests || []).filter(id => id !== targetId) };
       onUpdateUser(u);
+      setFriendRequests(friendRequests.filter(x => x.id !== targetId));
+  };
+
+  const handleUnfriend = async (targetId: string) => {
+      if(!confirm("Are you sure you want to remove this friend?")) return;
+      // Mock Unfriend (In real app would call backend)
+      const u = { ...user, friends: (user.friends || []).filter(id => id !== targetId) };
+      onUpdateUser(u);
+      setFriendsList(friendsList.filter(x => x.id !== targetId));
   };
 
   // Edit Tab State
@@ -303,13 +330,14 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
   return (
     <div className="bg-white dark:bg-[#18191a] min-h-screen pb-10">
       <input type="file" ref={storyInputRef} className="hidden" accept="image/*,video/*" onChange={handleStoryUpload} />
+      <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={handleDirectCoverChange} />
 
       {/* Header */}
       <div className="bg-white dark:bg-[#242526] shadow-sm pb-4 mb-4">
           <div className="max-w-5xl mx-auto">
               <div className="relative h-[200px] md:h-[350px] rounded-b-xl overflow-hidden bg-[#F0F2F5] dark:bg-slate-800 group">
                   <img src={user.coverPhoto || 'https://picsum.photos/1200/400?random=999'} alt="Cover" className="w-full h-full object-cover" />
-                  <button onClick={() => setIsEditing(true)} className="absolute bottom-4 right-4 bg-white dark:bg-slate-800 text-black dark:text-white px-3 py-2 rounded-lg flex items-center gap-2 font-semibold text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
+                  <button onClick={() => coverInputRef.current?.click()} className="absolute bottom-4 right-4 bg-white dark:bg-slate-800 text-black dark:text-white px-3 py-2 rounded-lg flex items-center gap-2 font-semibold text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
                       <Camera size={16} /> Edit Cover Photo
                   </button>
               </div>
@@ -370,7 +398,6 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
               <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm border border-[#DADDE1] dark:border-slate-700 p-6">
                   <h2 className="text-xl font-bold text-[#1C1E21] dark:text-white mb-6">About</h2>
                   <div className="space-y-6">
-                      {/* Bio */}
                       <div className="flex items-start gap-3">
                           <AlignLeft className="text-[#606770] dark:text-gray-400 mt-1" size={24} />
                           <div className="flex-1">
@@ -378,8 +405,6 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
                               <p className="text-[#1C1E21] dark:text-white text-lg">{user.bio || "No bio added."}</p>
                           </div>
                       </div>
-
-                      {/* Location */}
                       <div className="flex items-start gap-3">
                           <MapPin className="text-[#606770] dark:text-gray-400 mt-1" size={24} />
                           <div className="flex-1">
@@ -387,8 +412,6 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
                               <p className="text-[#1C1E21] dark:text-white text-lg">{user.location || "No location added."}</p>
                           </div>
                       </div>
-
-                      {/* Work */}
                       <div className="flex items-start gap-3">
                           <Briefcase className="text-[#606770] dark:text-gray-400 mt-1" size={24} />
                           <div className="flex-1">
@@ -396,8 +419,6 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
                               <p className="text-[#1C1E21] dark:text-white text-lg">{user.worksAt || "Not specified"}</p>
                           </div>
                       </div>
-
-                      {/* Website */}
                       <div className="flex items-start gap-3">
                           <LinkIcon className="text-[#606770] dark:text-gray-400 mt-1" size={24} />
                           <div className="flex-1">
@@ -418,12 +439,90 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, onToggleFollow })
               </div>
           )}
 
+          {/* FRIENDS TAB */}
+          {activeTab === 'FRIENDS' && (
+              <div className="bg-white dark:bg-[#242526] rounded-xl shadow-sm border border-[#DADDE1] dark:border-slate-700 p-6">
+                  {/* Header */}
+                  <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-xl font-bold text-[#1C1E21] dark:text-white">Friends</h2>
+                      <div className="flex gap-2">
+                          <button className="text-[#1877F2] font-semibold text-sm hover:bg-blue-50 dark:hover:bg-slate-700 px-3 py-1.5 rounded-md">Find Friends</button>
+                      </div>
+                  </div>
+
+                  {/* Friend Requests */}
+                  {friendRequests.length > 0 && (
+                      <div className="mb-8">
+                          <h3 className="font-bold text-lg text-[#1C1E21] dark:text-white mb-4">Friend Requests</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {friendRequests.map(req => (
+                                  <div key={req.id} className="flex items-center gap-3 p-3 border border-[#DADDE1] dark:border-slate-700 rounded-lg">
+                                      <img src={req.avatar} className="w-16 h-16 rounded-lg object-cover" alt="" />
+                                      <div className="flex-1">
+                                          <h4 className="font-bold text-[#1C1E21] dark:text-white">{req.name}</h4>
+                                          <div className="flex gap-2 mt-2">
+                                              <button onClick={() => handleAcceptRequest(req.id)} className="flex-1 bg-[#1877F2] text-white text-sm font-semibold py-1.5 rounded-md hover:bg-[#166fe5]">Confirm</button>
+                                              <button onClick={() => handleRejectRequest(req.id)} className="flex-1 bg-[#E4E6EB] text-[#1C1E21] text-sm font-semibold py-1.5 rounded-md hover:bg-[#D8DADF]">Delete</button>
+                                          </div>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                          <div className="my-6 border-t border-[#DADDE1] dark:border-slate-700"></div>
+                      </div>
+                  )}
+
+                  {/* All Friends */}
+                  <div className="mb-8">
+                      <h3 className="font-bold text-lg text-[#1C1E21] dark:text-white mb-4">All Friends</h3>
+                      {friendsList.length === 0 ? (
+                          <p className="text-[#606770] text-center py-8">No friends to show.</p>
+                      ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {friendsList.map(friend => (
+                                  <div key={friend.id} className="flex items-center justify-between p-3 border border-[#DADDE1] dark:border-slate-700 rounded-lg">
+                                      <div className="flex items-center gap-3">
+                                          <img src={friend.avatar} className="w-16 h-16 rounded-lg object-cover" alt="" />
+                                          <div>
+                                              <h4 className="font-bold text-[#1C1E21] dark:text-white">{friend.name}</h4>
+                                              <p className="text-xs text-[#606770]">{friend.type}</p>
+                                          </div>
+                                      </div>
+                                      <button onClick={() => handleUnfriend(friend.id)} className="text-[#606770] hover:bg-[#F0F2F5] p-2 rounded-full">
+                                          <MoreHorizontal size={20} />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+
+                  {/* Suggestions */}
+                  <div>
+                      <h3 className="font-bold text-lg text-[#1C1E21] dark:text-white mb-4">People You May Know</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {suggestedFriends.map(sugg => (
+                              <div key={sugg.id} className="flex items-center gap-3 p-3 border border-[#DADDE1] dark:border-slate-700 rounded-lg">
+                                  <img src={sugg.avatar} className="w-16 h-16 rounded-lg object-cover" alt="" />
+                                  <div className="flex-1">
+                                      <h4 className="font-bold text-[#1C1E21] dark:text-white">{sugg.name}</h4>
+                                      <button 
+                                        onClick={() => handleSendRequest(sugg.id)}
+                                        className="mt-2 w-full bg-[#E7F3FF] text-[#1877F2] text-sm font-semibold py-1.5 rounded-md hover:bg-[#DBEBFF] flex items-center justify-center gap-1"
+                                      >
+                                          <UserPlus size={16} /> Add Friend
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          )}
+
           {/* Other tabs would go here... keeping existing functionality for brevity */}
           {activeTab === 'POSTS' && (
               <div className="text-center py-10 text-gray-500">Posts component goes here (Feed)</div>
-          )}
-          {activeTab === 'FRIENDS' && (
-              <div className="text-center py-10 text-gray-500">Friends List</div>
           )}
           {activeTab === 'PHOTOS' && (
               <div className="text-center py-10 text-gray-500">Photos Grid</div>
